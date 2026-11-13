@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Market Levels — Fiyat ve Seviye Analizi</title>
+  <style>
+    :root { --bg: #0f172a; --card: #1e293b; --text: #f8fafc; --muted: #94a3b8; --accent: #3b82f6; --border: #334155; }
+    * { box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; }
+    body { background: var(--bg); color: var(--text); margin: 0; padding: 2rem 1rem; display: flex; justify-content: center; }
+    .container { width: 100%; max-width: 600px; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; margin-bottom: 1.25rem; }
+    h1 { margin: 0 0 0.5rem; font-size: 1.5rem; }
+    p.sub { color: var(--muted); margin: 0 0 1.5rem; font-size: 0.9rem; }
+    .form-row { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+    input, select, button { padding: 0.75rem 1rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: 1rem; }
+    input { flex: 2; min-width: 160px; text-transform: uppercase; }
+    select { flex: 1; min-width: 110px; }
+    button { background: var(--accent); border: none; font-weight: 600; cursor: pointer; flex: 1; min-width: 120px; }
+    button:hover { opacity: 0.9; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .error { color: #f87171; background: rgba(248, 113, 113, 0.1); padding: 0.75rem; border-radius: 8px; margin-top: 1rem; display: none; }
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; margin-bottom: 1.25rem; }
+    .stat-box { background: var(--bg); padding: 0.75rem; border-radius: 8px; border: 1px solid var(--border); }
+    .stat-label { font-size: 0.75rem; color: var(--muted); }
+    .stat-val { font-size: 1.1rem; font-weight: 700; margin-top: 0.25rem; }
+    table { width: 100%; border-collapse: collapse; margin-top: 0.5rem; }
+    th, td { text-align: left; padding: 0.65rem 0.5rem; border-bottom: 1px solid var(--border); font-size: 0.95rem; }
+    th { color: var(--muted); font-weight: 500; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <h1>Market Levels</h1>
+      <p class="sub">Seçilen dönemdeki en yüksek ve en düşük değerlere göre fiyat seviyelerini hesaplar.</p>
+      <div class="form-row">
+        <input id="symbol" type="text" placeholder="Örn: AKBNK.IS" value="AKBNK.IS" />
+        <select id="range">
+          <option value="1mo">1 Ay</option>
+          <option value="3mo">3 Ay</option>
+          <option value="6mo">6 Ay</option>
+          <option value="1y">1 Yıl</option>
+          <option value="2y" selected>2 Yıl</option>
+          <option value="5y">5 Yıl</option>
+        </select>
+        <button id="fetchBtn">Hesapla</button>
+      </div>
+      <div id="errorBox" class="error"></div>
+    </div>
+
+    <div id="resultCard" class="card hidden">
+      <div class="stats">
+        <div class="stat-box">
+          <div class="stat-label">Güncel Fiyat</div>
+          <div id="curPrice" class="stat-val">—</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">Dönem Zirvesi</div>
+          <div id="highPrice" class="stat-val">—</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">Dönem Dibi</div>
+          <div id="lowPrice" class="stat-val">—</div>
+        </div>
+      </div>
+      <table>
+        <thead>
+          <tr><th>Seviye</th><th>Oran</th><th>Fiyat</th></tr>
+        </thead>
+        <tbody id="levelsBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    const ratios = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
+    const btn = document.getElementById("fetchBtn");
+    const errBox = document.getElementById("errorBox");
+    const resCard = document.getElementById("resultCard");
+
+    async function loadLevels() {
+      const symbol = document.getElementById("symbol").value.trim();
+      const range = document.getElementById("range").value;
+      errBox.style.display = "none";
+      btn.disabled = true;
+      btn.textContent = "Yükleniyor...";
+
+      try {
+        const res = await fetch(`/api/quote?symbol=${encodeURIComponent(symbol)}&range=${range}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Veri alınamadı.");
+
+        const fmt = (n) => `${n.toFixed(2)} ${data.currency}`;
+        document.getElementById("curPrice").textContent = fmt(data.price);
+        document.getElementById("highPrice").textContent = fmt(data.high);
+        document.getElementById("lowPrice").textContent = fmt(data.low);
+
+        const diff = data.high - data.low;
+        const tbody = document.getElementById("levelsBody");
+        tbody.innerHTML = ratios.map((r, i) => {
+          const levelPrice = data.high - diff * r;
+          return `<tr><td>Seviye ${i + 1}</td><td>%${(r * 100).toFixed(1)}</td><td><strong>${fmt(levelPrice)}</strong></td></tr>`;
+        }).join("");
+
+        resCard.classList.remove("hidden");
+      } catch (e) {
+        errBox.textContent = e.message;
+        errBox.style.display = "block";
+        resCard.classList.add("hidden");
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Hesapla";
+      }
+    }
+
+    btn.addEventListener("click", loadLevels);
+    document.getElementById("symbol").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") loadLevels();
+    });
+  </script>
+</body>
+</html>

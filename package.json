@@ -1,0 +1,18 @@
+{
+  "name": "market-levels-server",
+  "version": "1.0.0",
+  "description": "Yahoo Finance verisiyle hisseler için dönem zirve/dip ve Fibonacci seviyelerini hesaplayan Node.js + Express uygulaması.",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "yahoo-finance2": "^3.0.0"
+  },
+  "license": "MIT"
+}
